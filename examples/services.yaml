@@ -1,0 +1,5 @@
+services:
+  - name: python-server
+    cmd: python3 -m http.server
+  - name: ping
+    cmd: ping 8.8.8.8
