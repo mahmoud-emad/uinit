@@ -1,6 +1,6 @@
 build:
-	go build -o miniinit cmd/miniinit/main.go
+	go build -o uinit main.go
 run:
-	./miniinit examples/services.yaml
+	./uinit examples/services.yaml
 clean:
-	rm -f miniinit
+	rm -f uinit

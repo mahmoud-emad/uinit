@@ -3,3 +3,5 @@ services:
     cmd: python3 -m http.server
   - name: ping
     cmd: ping 8.8.8.8
+  - name: sleep-five
+    cmd: sleep 5

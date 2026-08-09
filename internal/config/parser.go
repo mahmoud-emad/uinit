@@ -6,23 +6,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func NewMiniInit(filePath string) (MiniInit, error) {
-	mini := MiniInit{}
-	file, err := os.Open(filePath)
+func NewConfig(filePath string) (Config, error) {
+	cfg := Config{}
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return mini, err
+		return cfg, err
 	}
 
-	defer file.Close()
-
-	buf := make([]byte, 200)
-	n, err := file.Read(buf)
-	if err != nil {
-		return mini, err
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return cfg, err
 	}
 
-	if err := yaml.Unmarshal([]byte(buf[:n]), &mini); err != nil {
-		return mini, err
-	}
-	return mini, nil
+	return cfg, nil
 }
