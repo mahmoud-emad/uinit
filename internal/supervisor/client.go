@@ -1,7 +1,6 @@
 package supervisor
 
 import (
-	"log"
 	"net"
 )
 
@@ -42,15 +41,4 @@ func (c *UinitClient) List() (Response, error) {
 	}
 
 	return rsp, nil
-}
-
-func (c *UinitClient) Init() error {
-	defer c.conn.Close()
-
-	rsp, err := c.sendRequest("LIST", "")
-	if err != nil {
-		return err
-	}
-	log.Println("rsp: ", rsp)
-	return nil
 }

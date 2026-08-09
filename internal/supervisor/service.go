@@ -11,8 +11,10 @@ type ServiceStatus int
 
 const (
 	Loaded ServiceStatus = iota
+	Starting
 	Started
 	Running
+	Failed
 	Exited
 )
 
@@ -20,10 +22,14 @@ func (s ServiceStatus) String() string {
 	switch s {
 	case Loaded:
 		return "loaded"
+	case Starting:
+		return "starting"
 	case Started:
 		return "started"
 	case Running:
 		return "running"
+	case Failed:
+		return "failed"
 	case Exited:
 		return "exited"
 	default:

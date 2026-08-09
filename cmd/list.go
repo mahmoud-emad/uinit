@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/uinit/internal/supervisor"
@@ -60,15 +59,16 @@ func printServices(data interface{}) {
 		return
 	}
 
-	fmt.Printf("%-20s %-12s %-25s\n", "SERVICE", "STATUS", "LOADED AT")
-	fmt.Println("------------------------------------------------------------")
+	fmt.Printf("%-20s %-12s %-25s %-25s\n", "SERVICE", "STATUS", "LOADED AT", "EXITED AT")
+	fmt.Println("-----------------------------------------------------------------------")
 
 	for _, service := range services {
 		fmt.Printf(
-			"%-20s %-12s %-25s\n",
+			"%-20s %-12s %-25s %-25s\n",
 			service.Config.Name,
 			service.Runtime.Status,
-			service.Runtime.LoadedAt.Format(time.RFC3339),
+			service.Runtime.LoadedAt.Format("2006-01-02 15:04"),
+			service.Runtime.StoppedAt.Format("2006-01-02 15:04"),
 		)
 	}
 }
