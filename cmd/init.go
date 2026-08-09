@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/uinit/internal/config"
 	"github.com/uinit/internal/supervisor"
 )
 
@@ -20,22 +19,11 @@ func init() {
 }
 
 func initServices(filepath string) error {
-	_, err := config.NewConfig(filepath)
+	sup, err := supervisor.NewSupervisor(filepath)
 	if err != nil {
 		return err
 	}
 
-	supervisor.NewSupervisor()
-	// printLoadedServices(cfg)
-
+	sup.Run()
 	return nil
 }
-
-// func printLoadedServices(cfg config.MiniInit) {
-// 	fmt.Printf("\nLoaded %d services:\n", len(cfg.Services))
-
-// 	for _, service := range cfg.Services {
-// 		fmt.Printf("- %s:\n", service.Name)
-// 		fmt.Printf("  command: %s\n\n", service.Cmd)
-// 	}
-// }

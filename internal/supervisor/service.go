@@ -20,6 +20,7 @@ const (
 type ServiceRuntime struct {
 	Status    ServiceStatus
 	PID       int
+	LoadedAt  time.Time
 	StartedAt time.Time
 	StoppedAt time.Time
 	ExitCode  int
