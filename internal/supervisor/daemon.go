@@ -54,7 +54,6 @@ func (s *Supervisor) Run() error {
 
 func (s *Supervisor) handleConnection(conn net.Conn) error {
 	defer conn.Close()
-
 	reader := bufio.NewReader(conn)
 
 	line, err := reader.ReadBytes('\n')
@@ -62,30 +61,53 @@ func (s *Supervisor) handleConnection(conn net.Conn) error {
 		return err
 	}
 
-	req := Request{}
-	err = json.Unmarshal(line, &req)
-	if err != nil {
-		return err
+	var req Request
+	if err := json.Unmarshal(line, &req); err != nil {
+		return s.sendResponse(conn, Response{
+			OK:      false,
+			Message: fmt.Sprintf("invalid request: %v", err),
+		})
 	}
 
-	if req.Action == "LIST" {
+	log.Printf("request: action=%q service=%q", req.Action, req.Service)
+
+	switch req.Action {
+	case "LIST":
 		services := s.list()
-		rsp := Response{
+		return s.sendResponse(conn, Response{
 			OK:   true,
 			Data: services,
+		})
+
+	case "INSPECT":
+		serviceInfo, err := s.inspect(req.Service)
+		if err != nil {
+			log.Printf(
+				"request failed: action=%q service=%q error=%v",
+				req.Action,
+				req.Service,
+				err,
+			)
+			return s.sendResponse(conn, Response{
+				OK:      false,
+				Message: err.Error(),
+			})
 		}
 
-		encoded, err := json.Marshal(rsp)
-		if err != nil {
-			return err
-		}
+		return s.sendResponse(conn, Response{
+			OK:   true,
+			Data: serviceInfo,
+		})
 
-		encoded = append(encoded, '\n')
-		_, err = conn.Write(encoded)
-		if err != nil {
-			return err
-		}
-		return nil
+	default:
+		log.Printf(
+			"unknown action: action=%q service=%q",
+			req.Action,
+			req.Service,
+		)
+		return s.sendResponse(conn, Response{
+			OK:      false,
+			Message: fmt.Sprintf("unknown action: %q", req.Action),
+		})
 	}
-	return nil
 }

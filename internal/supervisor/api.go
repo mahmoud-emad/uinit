@@ -3,6 +3,7 @@ package supervisor
 import (
 	"bufio"
 	"encoding/json"
+	"net"
 )
 
 type Request struct {
@@ -48,4 +49,18 @@ func (c *UinitClient) sendRequest(action string, service string) (Response, erro
 	}
 
 	return rsp, nil
+}
+
+func (s *Supervisor) sendResponse(conn net.Conn, rsp Response) error {
+	encoded, err := json.Marshal(rsp)
+	if err != nil {
+		return err
+	}
+
+	encoded = append(encoded, '\n')
+	_, err = conn.Write(encoded)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -7,25 +7,26 @@ import (
 	"github.com/uinit/internal/supervisor"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all configured services",
+var inspectCmd = &cobra.Command{
+	Use:   "inspect <service>",
+	Short: "Inspect service",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return listServices()
+		return inspectServices(args[0])
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(inspectCmd)
 }
 
-func listServices() error {
+func inspectServices(serviceName string) error {
 	client, err := supervisor.NewClient()
 	if err != nil {
 		return err
 	}
 
-	rsp, err := client.List()
+	rsp, err := client.Inspect(serviceName)
 	if err != nil {
 		return err
 	}
@@ -34,6 +35,6 @@ func listServices() error {
 		return fmt.Errorf("response error %s", rsp.Message)
 	}
 
-	printList(rsp.Data)
+	printInspect(rsp.Data)
 	return nil
 }

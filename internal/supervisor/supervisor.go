@@ -128,3 +128,30 @@ func (s *Supervisor) list() []ServiceInfo {
 
 	return services
 }
+
+func (s *Supervisor) inspect(serviceName string) ([]ServiceInfo, error) {
+	response := []ServiceInfo{}
+
+	for _, service := range s.services {
+		if service.Config.Name != serviceName {
+			continue
+		}
+
+		serviceInfo := ServiceInfo{
+			Name:      service.Config.Name,
+			Cmd:       service.Config.Cmd,
+			ExitCode:  service.Runtime.ExitCode,
+			LoadedAt:  service.Runtime.LoadedAt,
+			PID:       service.Runtime.PID,
+			Status:    service.Runtime.Status,
+			StartedAt: service.Runtime.StartedAt,
+			StoppedAt: service.Runtime.StoppedAt,
+		}
+
+		response = append(response, serviceInfo)
+
+		return response, nil
+	}
+
+	return response, fmt.Errorf("service %q not found", serviceName)
+}

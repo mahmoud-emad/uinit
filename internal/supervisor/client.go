@@ -42,3 +42,14 @@ func (c *UinitClient) List() (Response, error) {
 
 	return rsp, nil
 }
+
+func (c *UinitClient) Inspect(serviceName string) (Response, error) {
+	defer c.conn.Close()
+
+	rsp, err := c.sendRequest("INSPECT", serviceName)
+	if err != nil {
+		return Response{}, err
+	}
+
+	return rsp, nil
+}

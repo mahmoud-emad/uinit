@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/spf13/cobra"
+	"github.com/uinit/internal/config"
 	"github.com/uinit/internal/supervisor"
 )
 
@@ -21,13 +20,18 @@ func init() {
 }
 
 func initServices(filepath string) error {
-	supervisor, err := supervisor.NewSupervisor(filepath)
+	// Read the config up front so the banner can show what is about to run.
+	cfg, err := config.NewConfig(filepath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	if err := supervisor.Run(); err != nil {
-		log.Fatal(err)
+	printStartup(filepath, cfg)
+
+	sup, err := supervisor.NewSupervisor(filepath)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	return sup.Run()
 }
