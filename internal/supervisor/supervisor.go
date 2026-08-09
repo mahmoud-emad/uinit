@@ -12,9 +12,11 @@ import (
 )
 
 const socketPath = "/tmp/uinit.sock"
+const logDirPath = "/tmp/uinit/logs"
 
 type Supervisor struct {
 	socketPath string
+	logDirPath string
 	services   []ManagedService
 	ConfigFile string
 }
@@ -25,20 +27,32 @@ func NewSupervisor(configFile string) (Supervisor, error) {
 		return Supervisor{}, err
 	}
 
-	dir := filepath.Dir(socketPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Socket directory.
+	sockDir := filepath.Dir(socketPath)
+	if err := os.MkdirAll(sockDir, 0755); err != nil {
 		return Supervisor{}, err
+	}
+
+	// Log directory.
+	if err := os.MkdirAll(logDirPath, 0755); err != nil {
+		return Supervisor{}, fmt.Errorf(
+			"create log directory: %w",
+			err,
+		)
 	}
 
 	sup := Supervisor{
 		socketPath: socketPath,
 		ConfigFile: configFile,
+		logDirPath: logDirPath,
 	}
 
 	sup.registerServices(cfg)
+
 	if err := sup.startServices(); err != nil {
 		return sup, err
 	}
+
 	return sup, nil
 }
 
@@ -83,13 +97,33 @@ func (s *Supervisor) startService(service ManagedService) (ManagedService, error
 	service.Runtime.StartedAt = time.Now()
 	service.Runtime.Status = Starting
 
+	logPath := filepath.Join(s.logDirPath, service.Config.Name+".log")
+
+	logFile, err := os.OpenFile(
+		logPath,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		return service, fmt.Errorf(
+			"open log file for %q: %w",
+			service.Config.Name,
+			err,
+		)
+	}
+
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
 	if err := cmd.Start(); err != nil {
+		logFile.Close()
 		service.Runtime.Status = Exited
 		return service, fmt.Errorf("failed to start %q: %w", service.Config.Name, err)
 	}
 
 	service.Runtime.PID = cmd.Process.Pid
 	service.Runtime.Status = Running
+	service.LogFile = logPath
 
 	// Monitor the process without blocking the supervisor.
 	go s.monitorService(service.Config.Name, cmd)
@@ -146,8 +180,10 @@ func (s *Supervisor) inspect(serviceName string) ([]ServiceInfo, error) {
 			Status:    service.Runtime.Status,
 			StartedAt: service.Runtime.StartedAt,
 			StoppedAt: service.Runtime.StoppedAt,
+			LogFile:   service.LogFile,
 		}
 
+		// fmt.Println(serviceInfo.)
 		response = append(response, serviceInfo)
 
 		return response, nil

@@ -50,6 +50,7 @@ type ServiceRuntime struct {
 type ManagedService struct {
 	Config  config.Service
 	Runtime ServiceRuntime
+	LogFile string
 }
 
 // ServiceInfo is the client facing view of a managed service.
@@ -62,6 +63,7 @@ type ServiceInfo struct {
 	StartedAt time.Time     `json:"started_at"`
 	StoppedAt time.Time     `json:"stopped_at"`
 	ExitCode  int           `json:"exit_code"`
+	LogFile   string        `json:"log_file"`
 }
 
 func (s ManagedService) Info() ServiceInfo {
@@ -74,5 +76,6 @@ func (s ManagedService) Info() ServiceInfo {
 		StartedAt: s.Runtime.StartedAt,
 		StoppedAt: s.Runtime.StoppedAt,
 		ExitCode:  s.Runtime.ExitCode,
+		LogFile:   s.LogFile,
 	}
 }

@@ -113,6 +113,7 @@ func printInspect(services []supervisor.ServiceInfo) {
 		printField("Duration", formatAge(s))
 
 		// Error and Logs go here once ServiceInfo carries them.
+		printField("Logs", bold.Render(s.LogFile))
 
 		fmt.Println()
 	}
