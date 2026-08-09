@@ -45,8 +45,9 @@ In another terminal, list the services:
 ```
 
 ```
-SERVICE              STATUS       LOADED AT
-------------------------------------------------------------
-python-server        loaded       2026-08-09T11:20:41+02:00
-ping                 loaded       2026-08-09T11:20:41+02:00
+SERVICE        STATUS      PID      UPTIME   COMMAND
+─────────────────────────────────────────────────────────────────────
+python-server  ● running   45609    7s       python3 -m http.server
+ping           ● running   45610    7s       ping 8.8.8.8
+sleep-five     ○ exited    45611    5s       sleep 5
 ```
