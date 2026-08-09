@@ -42,13 +42,18 @@ func (s *Supervisor) Run() error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			// Listener was closed because of shutdown.
-			return nil
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+
+			return err
 		}
 
-		if err := s.handleConnection(conn); err != nil {
-			log.Printf("connection error: %v", err)
-		}
+		go func() {
+			if err := s.handleConnection(conn); err != nil {
+				log.Printf("connection error: %v", err)
+			}
+		}()
 	}
 }
 
