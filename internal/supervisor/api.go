@@ -11,9 +11,9 @@ type Request struct {
 }
 
 type Response struct {
-	OK      bool        `json:"ok"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	OK      bool          `json:"ok"`
+	Message string        `json:"message,omitempty"`
+	Data    []ServiceInfo `json:"data,omitempty"`
 }
 
 func (c *UinitClient) sendRequest(action string, service string) (Response, error) {

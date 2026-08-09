@@ -51,3 +51,28 @@ type ManagedService struct {
 	Config  config.Service
 	Runtime ServiceRuntime
 }
+
+// ServiceInfo is the client facing view of a managed service.
+type ServiceInfo struct {
+	Name      string        `json:"name"`
+	Cmd       string        `json:"cmd"`
+	Status    ServiceStatus `json:"status"`
+	PID       int           `json:"pid"`
+	LoadedAt  time.Time     `json:"loaded_at"`
+	StartedAt time.Time     `json:"started_at"`
+	StoppedAt time.Time     `json:"stopped_at"`
+	ExitCode  int           `json:"exit_code"`
+}
+
+func (s ManagedService) Info() ServiceInfo {
+	return ServiceInfo{
+		Name:      s.Config.Name,
+		Cmd:       s.Config.Cmd,
+		Status:    s.Runtime.Status,
+		PID:       s.Runtime.PID,
+		LoadedAt:  s.Runtime.LoadedAt,
+		StartedAt: s.Runtime.StartedAt,
+		StoppedAt: s.Runtime.StoppedAt,
+		ExitCode:  s.Runtime.ExitCode,
+	}
+}

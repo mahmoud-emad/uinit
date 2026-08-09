@@ -120,6 +120,11 @@ func (s *Supervisor) monitorService(name string, cmd *exec.Cmd) {
 	}
 }
 
-func (s *Supervisor) list() []ManagedService {
-	return s.services
+func (s *Supervisor) list() []ServiceInfo {
+	services := make([]ServiceInfo, 0, len(s.services))
+	for _, service := range s.services {
+		services = append(services, service.Info())
+	}
+
+	return services
 }

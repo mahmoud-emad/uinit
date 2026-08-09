@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"github.com/uinit/internal/supervisor"
@@ -40,35 +41,68 @@ func listServices() error {
 	return nil
 }
 
-func printServices(data interface{}) {
-	servicesJSON, err := json.Marshal(data)
-	if err != nil {
-		fmt.Println("failed to format services:", err)
-		return
-	}
+// Fixed widths for the columns that never grow, plus the cap on how much
+// of a command line is worth showing.
+const (
+	statusWidth = 10
+	pidWidth    = 7
+	uptimeWidth = 7
+	maxCmdWidth = 40
+	gutter      = "  "
+)
 
-	var services []supervisor.ManagedService
-
-	if err := json.Unmarshal(servicesJSON, &services); err != nil {
-		fmt.Println("failed to parse services:", err)
-		return
-	}
-
+func printServices(services []supervisor.ServiceInfo) {
 	if len(services) == 0 {
-		fmt.Println("No services loaded.")
+		fmt.Println(style("No services loaded.", dim))
 		return
 	}
 
-	fmt.Printf("%-20s %-12s %-25s %-25s\n", "SERVICE", "STATUS", "LOADED AT", "EXITED AT")
-	fmt.Println("-----------------------------------------------------------------------")
+	nameWidth := len("SERVICE")
+	cmdWidth := len("COMMAND")
 
 	for _, service := range services {
-		fmt.Printf(
-			"%-20s %-12s %-25s %-25s\n",
-			service.Config.Name,
-			service.Runtime.Status,
-			service.Runtime.LoadedAt.Format("2006-01-02 15:04"),
-			service.Runtime.StoppedAt.Format("2006-01-02 15:04"),
-		)
+		nameWidth = max(nameWidth, utf8.RuneCountInString(service.Name))
+		cmdWidth = max(cmdWidth, utf8.RuneCountInString(service.Cmd))
 	}
+
+	cmdWidth = min(cmdWidth, maxCmdWidth)
+
+	header := row(
+		pad("SERVICE", nameWidth),
+		pad("STATUS", statusWidth),
+		pad("PID", pidWidth),
+		pad("UPTIME", uptimeWidth),
+		"COMMAND",
+	)
+
+	width := nameWidth + statusWidth + pidWidth + uptimeWidth + cmdWidth + 5*len(gutter)
+
+	fmt.Println()
+	fmt.Println(style(header, bold))
+	fmt.Println(style(strings.Repeat("─", width), dim))
+
+	running := 0
+
+	for _, service := range services {
+		if service.Status == supervisor.Running || service.Status == supervisor.Started {
+			running++
+		}
+
+		fmt.Println(row(
+			pad(service.Name, nameWidth),
+			formatStatus(service.Status, statusWidth),
+			style(pad(formatPID(service.PID), pidWidth), dim),
+			pad(formatAge(service), uptimeWidth),
+			style(truncate(service.Cmd, cmdWidth), dim),
+		))
+	}
+
+	fmt.Println()
+	fmt.Println(style(fmt.Sprintf("%s%d services · %d running", gutter, len(services), running), dim))
+	fmt.Println()
+}
+
+// row indents the line and separates each cell by the gutter.
+func row(cells ...string) string {
+	return gutter + strings.Join(cells, gutter)
 }
