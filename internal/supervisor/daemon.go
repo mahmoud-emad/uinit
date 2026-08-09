@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"syscall"
 )
 
@@ -26,12 +27,23 @@ func (s *Supervisor) Run() error {
 		os.Remove(s.socketPath)
 	}()
 
+	// Handle graceful shutdown.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Println("Shutting down uinit...")
+		listener.Close()
+	}()
+
 	log.Printf("Listening on Unix socket: %s", s.socketPath)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			return err
+			// Listener was closed because of shutdown.
+			return nil
 		}
 
 		if err := s.handleConnection(conn); err != nil {
