@@ -33,15 +33,15 @@ func (c *UinitClient) connect() (net.Conn, error) {
 	return conn, nil
 }
 
-func (c *UinitClient) List() error {
+func (c *UinitClient) List() (Response, error) {
 	defer c.conn.Close()
 
 	rsp, err := c.sendRequest("LIST", "")
 	if err != nil {
-		return err
+		return Response{}, err
 	}
-	log.Println("rsp: ", rsp)
-	return nil
+
+	return rsp, nil
 }
 
 func (c *UinitClient) Init() error {

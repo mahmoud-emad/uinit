@@ -1,8 +1,8 @@
 package supervisor
 
 import (
+	"bufio"
 	"encoding/json"
-	"log"
 )
 
 type Request struct {
@@ -31,11 +31,21 @@ func (c *UinitClient) sendRequest(action string, service string) (Response, erro
 
 	encoded = append(encoded, '\n')
 
-	n, err := c.conn.Write(encoded)
+	_, err = c.conn.Write(encoded)
 	if err != nil {
 		return rsp, err
 	}
 
-	log.Println("n is: ", n)
+	reader := bufio.NewReader(c.conn)
+
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return rsp, err
+	}
+
+	if err := json.Unmarshal(line, &rsp); err != nil {
+		return rsp, err
+	}
+
 	return rsp, nil
 }

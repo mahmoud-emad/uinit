@@ -3,17 +3,30 @@ package supervisor
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net"
+	"os"
+	"syscall"
 )
 
 func (s *Supervisor) Run() error {
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := net.Listen("unix", s.socketPath)
 	if err != nil {
+		if errors.Is(err, syscall.EADDRINUSE) {
+			return fmt.Errorf("uinit daemon is already running")
+		}
+
 		return err
 	}
 
-	log.Printf("Listening on Linux socket: %s", socketPath)
+	defer func() {
+		listener.Close()
+		os.Remove(s.socketPath)
+	}()
+
+	log.Printf("Listening on Unix socket: %s", s.socketPath)
 
 	for {
 		conn, err := listener.Accept()
@@ -23,7 +36,6 @@ func (s *Supervisor) Run() error {
 
 		if err := s.handleConnection(conn); err != nil {
 			log.Printf("connection error: %v", err)
-			continue
 		}
 	}
 }
@@ -45,10 +57,23 @@ func (s *Supervisor) handleConnection(conn net.Conn) error {
 	}
 
 	if req.Action == "LIST" {
-		err := s.list()
+		services := s.list()
+		rsp := Response{
+			OK:   true,
+			Data: services,
+		}
+
+		encoded, err := json.Marshal(rsp)
 		if err != nil {
 			return err
 		}
+
+		encoded = append(encoded, '\n')
+		_, err = conn.Write(encoded)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 	return nil
 }

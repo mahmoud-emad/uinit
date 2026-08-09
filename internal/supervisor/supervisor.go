@@ -1,7 +1,6 @@
 package supervisor
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,7 +21,6 @@ func NewSupervisor(configFile string) (Supervisor, error) {
 	if err != nil {
 		return Supervisor{}, err
 	}
-	_ = os.Remove(socketPath)
 
 	dir := filepath.Dir(socketPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -34,16 +32,13 @@ func NewSupervisor(configFile string) (Supervisor, error) {
 		ConfigFile: configFile,
 	}
 
-	if err := sup.registerServices(cfg); err != nil {
-		return Supervisor{}, err
-	}
-
+	sup.registerServices(cfg)
 	return sup, nil
 }
 
-func (s *Supervisor) registerServices(config config.Config) error {
-	for _, service := range config.Services {
-		mservice := ManagedService{
+func (s *Supervisor) registerServices(cfg config.Config) {
+	for _, service := range cfg.Services {
+		managedService := ManagedService{
 			Config: service,
 			Runtime: ServiceRuntime{
 				Status:   Loaded,
@@ -51,17 +46,10 @@ func (s *Supervisor) registerServices(config config.Config) error {
 			},
 		}
 
-		services := append(s.services, mservice)
-		fmt.Println(services)
+		s.services = append(s.services, managedService)
 	}
-	return nil
 }
 
-func (s *Supervisor) list() error {
-	fmt.Println("Listing services")
-	for _, service := range s.services {
-		fmt.Println("service: ", service)
-	}
-
-	return nil
+func (s *Supervisor) list() []ManagedService {
+	return s.services
 }
