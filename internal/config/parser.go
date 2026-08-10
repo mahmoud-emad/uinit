@@ -1,3 +1,4 @@
+// Package config loads the process list from a YAML file.
 package config
 
 import (

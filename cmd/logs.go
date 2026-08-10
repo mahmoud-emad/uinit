@@ -8,26 +8,26 @@ import (
 	"github.com/uinit/internal/manager"
 )
 
-var inspectCmd = &cobra.Command{
-	Use:   "inspect <process>",
-	Short: "Inspect process",
+var logsCmd = &cobra.Command{
+	Use:   "logs <process>",
+	Short: "Show the logs of a process",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return inspectProcess(args[0])
+		return logsProcess(args[0])
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(inspectCmd)
+	rootCmd.AddCommand(logsCmd)
 }
 
-func inspectProcess(processName string) error {
+func logsProcess(processName string) error {
 	cli, err := client.NewClient(manager.SocketPath)
 	if err != nil {
 		return err
 	}
 
-	rsp, err := cli.Inspect(processName)
+	rsp, err := cli.Logs(processName)
 	if err != nil {
 		return err
 	}
@@ -36,6 +36,5 @@ func inspectProcess(processName string) error {
 		return fmt.Errorf("response error %s", rsp.Message)
 	}
 
-	printInspect(rsp.Data)
-	return nil
+	return printLogs(rsp.Data)
 }

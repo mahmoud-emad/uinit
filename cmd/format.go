@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/uinit/internal/config"
-	"github.com/uinit/internal/supervisor"
+	"github.com/uinit/internal/manager"
+	"github.com/uinit/internal/process"
 )
 
 // lipgloss drops the colors on its own when the output is piped or NO_COLOR
@@ -34,17 +36,17 @@ func printStartup(configFile string, cfg config.Config) {
 	fmt.Println(rule())
 
 	printField("Config", configFile)
-	printField("Services", fmt.Sprintf("%d", len(cfg.Services)))
+	printField("Processes", fmt.Sprintf("%d", len(cfg.Processes)))
 	fmt.Println()
 
 	width := 0
-	for _, s := range cfg.Services {
-		width = max(width, lipgloss.Width(s.Name))
+	for _, p := range cfg.Processes {
+		width = max(width, lipgloss.Width(p.Name))
 	}
 
 	name := lipgloss.NewStyle().Width(width + 2)
-	for _, s := range cfg.Services {
-		fmt.Println(name.Render(s.Name) + dim.Render(s.Cmd))
+	for _, p := range cfg.Processes {
+		fmt.Println(name.Render(p.Name) + dim.Render(p.Cmd))
 	}
 
 	fmt.Println()
@@ -52,10 +54,10 @@ func printStartup(configFile string, cfg config.Config) {
 	fmt.Println()
 }
 
-// printList prints one or more services as a table.
-func printList(services []supervisor.ServiceInfo) {
-	if len(services) == 0 {
-		fmt.Println(dim.Render("No services loaded."))
+// printList prints one or more processes as a table.
+func printList(processes []manager.ProcessInfo) {
+	if len(processes) == 0 {
+		fmt.Println(dim.Render("No processes loaded."))
 		return
 	}
 
@@ -64,7 +66,7 @@ func printList(services []supervisor.ServiceInfo) {
 		BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
 		BorderColumn(false).
 		BorderStyle(dim).
-		Headers("SERVICE", "STATUS", "PID", "UPTIME", "COMMAND").
+		Headers("PROCESS", "STATUS", "PID", "UPTIME", "COMMAND").
 		StyleFunc(func(row, _ int) lipgloss.Style {
 			if row == table.HeaderRow {
 				return cell.Bold(true)
@@ -74,46 +76,74 @@ func printList(services []supervisor.ServiceInfo) {
 
 	running := 0
 
-	for _, s := range services {
-		if s.Status == supervisor.Running || s.Status == supervisor.Started {
+	for _, p := range processes {
+		if p.Status == process.Running {
 			running++
 		}
 
-		t.Row(s.Name, formatStatus(s.Status), formatPID(s.PID), formatAge(s), dim.Render(s.Cmd))
+		t.Row(p.Name, formatStatus(p.Status), formatPID(p.PID), formatAge(p), dim.Render(p.Cmd))
 	}
 
 	fmt.Println()
 	fmt.Println(t)
 	fmt.Println()
-	fmt.Println(dim.Render(fmt.Sprintf("%d services · %d running", len(services), running)))
+	fmt.Println(dim.Render(fmt.Sprintf("%d processes · %d running", len(processes), running)))
 	fmt.Println()
 }
 
-// printInspect prints one or more services in full, one block each.
-func printInspect(services []supervisor.ServiceInfo) {
-	if len(services) == 0 {
-		fmt.Println(dim.Render("No services found."))
+// printLogs dumps what a process has written so far. The daemon only reports
+// where the log file is, the reading happens here.
+func printLogs(processes []manager.ProcessInfo) error {
+	if len(processes) == 0 {
+		fmt.Println(dim.Render("No processes found."))
+		return nil
+	}
+
+	p := processes[0]
+
+	if p.LogFile == "" {
+		fmt.Println(dim.Render("No log file for " + p.Name + "."))
+		return nil
+	}
+
+	logs, err := os.ReadFile(p.LogFile)
+	if err != nil {
+		return err
+	}
+
+	if len(logs) == 0 {
+		fmt.Println(dim.Render("No logs yet for " + p.Name + "."))
+		return nil
+	}
+
+	fmt.Print(string(logs))
+	return nil
+}
+
+// printInspect prints one or more processes in full, one block each.
+func printInspect(processes []manager.ProcessInfo) {
+	if len(processes) == 0 {
+		fmt.Println(dim.Render("No processes found."))
 		return
 	}
 
-	for _, s := range services {
+	for _, p := range processes {
 		fmt.Println()
-		fmt.Println("Service: " + bold.Render(s.Name))
+		fmt.Println("Process: " + bold.Render(p.Name))
 		fmt.Println(rule())
 
-		printField("Status", formatStatus(s.Status))
-		printField("PID", formatPID(s.PID))
-		printField("Command", s.Cmd)
+		printField("Status", formatStatus(p.Status))
+		printField("PID", formatPID(p.PID))
+		printField("Command", p.Cmd)
 
 		fmt.Println()
-		printField("Loaded", formatTime(s.LoadedAt))
-		printField("Started", formatTime(s.StartedAt))
-		printField("Stopped", formatTime(s.StoppedAt))
-		printField("Exit code", formatExitCode(s))
-		printField("Duration", formatAge(s))
+		printField("Started", formatTime(p.StartedAt))
+		printField("Stopped", formatTime(p.StoppedAt))
+		printField("Exit code", formatExitCode(p))
+		printField("Duration", formatAge(p))
 
-		// Error and Logs go here once ServiceInfo carries them.
-		printField("Logs", bold.Render(s.LogFile))
+		// Error goes here once ProcessInfo carries it.
+		printField("Logs", bold.Render(p.LogFile))
 
 		fmt.Println()
 	}
@@ -127,15 +157,15 @@ func rule() string {
 	return dim.Render(strings.Repeat("─", ruleWidth))
 }
 
-func formatStatus(status supervisor.ServiceStatus) string {
+func formatStatus(status process.Status) string {
 	switch status {
-	case supervisor.Running, supervisor.Started:
+	case process.Running:
 		return green.Render("● " + status.String())
-	case supervisor.Starting:
+	case process.Starting:
 		return yellow.Render("◌ " + status.String())
-	case supervisor.Failed:
+	case process.Failed:
 		return red.Render("✕ " + status.String())
-	case supervisor.Exited:
+	case process.Exited:
 		return dim.Render("○ " + status.String())
 	default:
 		return cyan.Render("· " + status.String())
@@ -159,27 +189,27 @@ func formatTime(t time.Time) string {
 }
 
 // formatExitCode only means something once the process is gone.
-func formatExitCode(s supervisor.ServiceInfo) string {
-	if s.StoppedAt.IsZero() {
+func formatExitCode(p manager.ProcessInfo) string {
+	if p.StoppedAt.IsZero() {
 		return "-"
 	}
 
-	return fmt.Sprintf("%d", s.ExitCode)
+	return fmt.Sprintf("%d", p.ExitCode)
 }
 
-// formatAge reports how long a service has been up, or how long it ran
+// formatAge reports how long a process has been up, or how long it ran
 // before it stopped.
-func formatAge(s supervisor.ServiceInfo) string {
-	if s.StartedAt.IsZero() {
+func formatAge(p manager.ProcessInfo) string {
+	if p.StartedAt.IsZero() {
 		return "-"
 	}
 
 	end := time.Now()
-	if !s.StoppedAt.IsZero() {
-		end = s.StoppedAt
+	if !p.StoppedAt.IsZero() {
+		end = p.StoppedAt
 	}
 
-	return formatDuration(end.Sub(s.StartedAt))
+	return formatDuration(end.Sub(p.StartedAt))
 }
 
 func formatDuration(d time.Duration) string {

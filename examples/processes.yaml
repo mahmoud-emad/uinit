@@ -1,4 +1,4 @@
-services:
+processes:
   - name: python-server
     cmd: python3 -m http.server
   - name: ping
