@@ -62,3 +62,14 @@ func (c *UinitClient) Logs(processName string) (manager.Response, error) {
 
 	return rsp, nil
 }
+
+func (c *UinitClient) Status(processName string) (manager.Response, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	rsp, err := c.sendRequest("STATUS", processName)
+	if err != nil {
+		return manager.Response{}, err
+	}
+
+	return rsp, nil
+}

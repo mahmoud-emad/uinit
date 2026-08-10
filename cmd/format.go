@@ -120,6 +120,24 @@ func printLogs(processes []manager.ProcessInfo) error {
 	return nil
 }
 
+// printStatus prints the process current status.
+func printStatus(processes []manager.ProcessInfo) error {
+	if len(processes) == 0 {
+		fmt.Println(dim.Render("No processes found."))
+		return nil
+	}
+
+	p := processes[0]
+
+	fmt.Println()
+	fmt.Println("Process: " + bold.Render(p.Name))
+	fmt.Println(rule())
+
+	printField("Status", formatStatus(p.Status))
+	fmt.Println()
+	return nil
+}
+
 // printInspect prints one or more processes in full, one block each.
 func printInspect(processes []manager.ProcessInfo) {
 	if len(processes) == 0 {

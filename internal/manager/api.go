@@ -41,7 +41,7 @@ func (pm *ProcessManager) handleRequest(req Request) Response {
 
 	// Both answer with the same view, the client either prints it or reads
 	// the log file it points at.
-	case "INSPECT", "LOGS":
+	case "INSPECT", "LOGS", "STATUS":
 		info, err := pm.Inspect(req.Process)
 		if err != nil {
 			return errorResponse(err)
