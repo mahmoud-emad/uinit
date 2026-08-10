@@ -60,3 +60,14 @@ Inspect one of them, or read what it has written:
 ```
 
 Each process writes its stdout and stderr to `/tmp/uinit/logs/<name>.log`.
+
+## Development
+
+```sh
+make lint   # gofmt, go vet, staticcheck, errcheck
+make test   # go test -race ./...
+make dist   # cross compile into dist/
+```
+
+CI runs the same three on every push and pull request. Tagging `v*` builds the
+binaries and publishes them to a GitHub release.

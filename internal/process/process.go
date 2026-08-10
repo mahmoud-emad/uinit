@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
 // Start runs command and sends everything it writes to out. Where out points
@@ -44,4 +45,13 @@ func (p *Process) ExitCode() int {
 	}
 
 	return p.cmd.ProcessState.ExitCode()
+}
+
+// Kill sends a SIGTERM to tell the process to gracefully exit.
+func (p *Process) Kill() error {
+	err := p.cmd.Process.Signal(syscall.SIGTERM)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -48,6 +48,9 @@ func (pm *ProcessManager) Run() error {
 func (pm *ProcessManager) handleSignals(listener net.Listener) {
 	sigChan := make(chan os.Signal, 1)
 
+	// - On Ctrl+C the daemon closes the listener and exits, but never signals the
+	// children. ping and friends survive as orphans reparented to init. That's a
+	// real bug, not a style issue.
 	signal.Notify(
 		sigChan,
 		os.Interrupt,
