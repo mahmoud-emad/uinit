@@ -116,7 +116,7 @@ func (pm *ProcessManager) startProcesses() error {
 	}
 
 	for i := range pm.processes {
-		if err := pm.startProcess(i); err != nil {
+		if err := pm.startProcess(&pm.processes[i]); err != nil {
 			return err
 		}
 	}
@@ -124,11 +124,13 @@ func (pm *ProcessManager) startProcesses() error {
 	return nil
 }
 
-func (pm *ProcessManager) startProcess(index int) error {
-	proc := &pm.processes[index]
-
+// startProcess takes a pointer into pm.processes so the status it writes is
+// visible to everything else reading the slice.
+func (pm *ProcessManager) startProcess(proc *ManagedProcess) error {
 	proc.Runtime.Status = process.Starting
 	proc.Runtime.StartedAt = time.Now()
+	proc.Runtime.StoppedAt = time.Time{}
+	proc.Runtime.ExitCode = 0
 
 	logPath := filepath.Join(pm.logDirPath, proc.Config.Name+".log")
 
@@ -164,13 +166,13 @@ func (pm *ProcessManager) startProcess(index int) error {
 	proc.Runtime.Status = process.Running
 	proc.LogFile = logPath
 
-	go pm.monitorProcess(index, p, logFile)
+	go pm.monitorProcess(proc, p, logFile)
 
 	return nil
 }
 
 func (pm *ProcessManager) monitorProcess(
-	index int,
+	proc *ManagedProcess,
 	p *process.Process,
 	logFile *os.File,
 ) {
@@ -180,8 +182,6 @@ func (pm *ProcessManager) monitorProcess(
 
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-
-	proc := &pm.processes[index]
 
 	proc.Runtime.StoppedAt = time.Now()
 	proc.Runtime.ExitCode = p.ExitCode()
