@@ -84,3 +84,14 @@ func (c *UinitClient) Start(processName string) (manager.Response, error) {
 
 	return rsp, nil
 }
+
+func (c *UinitClient) Stop(processName string) (manager.Response, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	rsp, err := c.sendRequest("STOP", processName)
+	if err != nil {
+		return manager.Response{}, err
+	}
+
+	return rsp, nil
+}

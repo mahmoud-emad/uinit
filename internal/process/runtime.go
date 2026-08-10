@@ -15,6 +15,7 @@ const (
 	Loaded Status = iota
 	Starting
 	Running
+	Stopped
 	Failed
 	Exited
 )
@@ -27,6 +28,8 @@ func (s Status) String() string {
 		return "starting"
 	case Running:
 		return "running"
+	case Stopped:
+		return "stopped"
 	case Failed:
 		return "failed"
 	case Exited:

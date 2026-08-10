@@ -4,6 +4,7 @@ package process
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -48,8 +49,13 @@ func (p *Process) ExitCode() int {
 }
 
 // Kill sends a SIGTERM to tell the process to gracefully exit.
-func (p *Process) Kill() error {
-	err := p.cmd.Process.Signal(syscall.SIGTERM)
+func Kill(pid int) error {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+
+	err = process.Signal(syscall.SIGTERM)
 	if err != nil {
 		return err
 	}

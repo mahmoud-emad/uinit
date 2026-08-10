@@ -65,6 +65,17 @@ func (pm *ProcessManager) handleRequest(req Request) Response {
 			Data: []ProcessInfo{info},
 		}
 
+	case "STOP":
+		info, err := pm.Stop(req.Process)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		return Response{
+			OK:   true,
+			Data: []ProcessInfo{info},
+		}
+
 	default:
 		return Response{
 			OK: false,
@@ -188,6 +199,64 @@ func (pm *ProcessManager) Start(name string) (ProcessInfo, error) {
 			info.LogFile,
 		)
 	}
+
+	return info, nil
+}
+
+func (pm *ProcessManager) Stop(name string) (ProcessInfo, error) {
+	pm.mu.Lock()
+
+	idx := -1
+
+	for i := range pm.processes {
+		if pm.processes[i].Config.Name == name {
+			idx = i
+			break
+		}
+	}
+
+	if idx == -1 {
+		pm.mu.Unlock()
+
+		return ProcessInfo{}, fmt.Errorf(
+			"process %q not found",
+			name,
+		)
+	}
+
+	p := &pm.processes[idx]
+
+	if p.Runtime.Status == process.Failed ||
+		p.Runtime.Status == process.Exited ||
+		p.Runtime.Status == process.Stopped {
+		pm.mu.Unlock()
+
+		return ProcessInfo{}, fmt.Errorf(
+			"process %q is already down",
+			name,
+		)
+	}
+
+	pid := p.Runtime.PID
+
+	pm.mu.Unlock()
+
+	// Don't hold the mutex while talking to the OS.
+	if err := process.Kill(pid); err != nil {
+		return ProcessInfo{}, fmt.Errorf(
+			"failed to stop process %q: %w",
+			name,
+			err,
+		)
+	}
+
+	// Give monitorProcess a chance to observe the exit.
+	time.Sleep(startSettle)
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	info := pm.processes[idx].Info()
 
 	return info, nil
 }
