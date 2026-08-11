@@ -114,3 +114,15 @@ func (pm *ProcessManager) Start(processName string) (*process.Process, error) {
 	}
 	return proc, nil
 }
+
+func (pm *ProcessManager) Stop(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := proc.Stop(); err != nil {
+		return nil, err
+	}
+	return proc, nil
+}

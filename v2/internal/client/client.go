@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net"
 
 	"github.com/uinit/internal/manager"
@@ -34,6 +35,29 @@ func (c *UinitClient) connect() (net.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+func request[T any](
+	c *UinitClient,
+	action string,
+	processName string,
+) (T, error) {
+	var result T
+
+	rsp, err := c.sendRequest(action, processName)
+	if err != nil {
+		return result, err
+	}
+
+	if !rsp.OK {
+		return result, fmt.Errorf("%s", rsp.Message)
+	}
+
+	if err := c.decodeResponse(rsp.Data, &result); err != nil {
+		return result, err
+	}
+
+	return result, nil
 }
 
 func (c *UinitClient) sendRequest(

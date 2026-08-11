@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 
 	"github.com/uinit/internal/config"
@@ -24,12 +25,9 @@ func NewManager(configFilePath string) (*ProcessManager, error) {
 		cfg: cfg,
 	}
 
-	// Create a copy of the user config file so the cli can read from it
-
 	pm.loadProcesses(cfg)
-	if err := pm.startProcesses(); err != nil {
-		return nil, err
-	}
+
+	pm.startProcesses()
 
 	return &pm, nil
 }
@@ -50,17 +48,16 @@ func (pm *ProcessManager) loadProcesses(cfg config.Config) {
 	}
 }
 
-func (pm *ProcessManager) startProcesses() error {
-	if len(pm.processes) == 0 {
-		return fmt.Errorf("there are no registered processes to start")
-	}
-
-	for _, process := range pm.processes {
-		if err := process.Start(); err != nil {
-			return err
+func (pm *ProcessManager) startProcesses() {
+	for _, p := range pm.processes {
+		if err := p.Start(); err != nil {
+			log.Printf(
+				"failed to start process %q: %v",
+				p.Name,
+				err,
+			)
 		}
 	}
-	return nil
 }
 
 func (pm *ProcessManager) stopProcesses() error {

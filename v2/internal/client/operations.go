@@ -8,67 +8,37 @@ import (
 func (c *UinitClient) List() ([]ProcessInfo, error) {
 	defer func() { _ = c.conn.Close() }()
 
-	rsp, err := c.sendRequest("LIST", "")
-	if err != nil {
-		return nil, err
-	}
-
-	var processes []ProcessInfo
-
-	if err := c.decodeResponse(rsp.Data, &processes); err != nil {
-		return nil, err
-	}
-	return processes, nil
+	return request[[]ProcessInfo](c, "LIST", "")
 }
 
 func (c *UinitClient) Inspect(processName string) (*ProcessInfo, error) {
 	defer func() { _ = c.conn.Close() }()
 
-	rsp, err := c.sendRequest("INSPECT", processName)
-	if err != nil {
-		return nil, err
-	}
-
-	var process *ProcessInfo
-
-	if err := c.decodeResponse(rsp.Data, &process); err != nil {
-		return nil, err
-	}
-	return process, nil
+	return request[*ProcessInfo](c, "INSPECT", processName)
 }
 
 func (c *UinitClient) Start(processName string) (*ProcessInfo, error) {
 	defer func() { _ = c.conn.Close() }()
 
-	rsp, err := c.sendRequest("START", processName)
-	if err != nil {
-		return nil, err
-	}
+	return request[*ProcessInfo](c, "START", processName)
+}
 
-	var process *ProcessInfo
+func (c *UinitClient) Stop(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
 
-	if err := c.decodeResponse(rsp.Data, &process); err != nil {
-		return nil, err
-	}
-	return process, nil
+	return request[*ProcessInfo](c, "STOP", processName)
 }
 
 func (c *UinitClient) Logs(processName string) (string, error) {
 	defer func() { _ = c.conn.Close() }()
 
-	rsp, err := c.sendRequest("LOGS", processName)
+	proc, err := request[*ProcessInfo](c, "LOGS", processName)
 	if err != nil {
 		return "", err
 	}
 
-	proc := ProcessInfo{}
-
-	if err := c.decodeResponse(rsp.Data, &proc); err != nil {
-		return "", err
-	}
-
 	if proc.LogPath == "" {
-		return "", fmt.Errorf("No log file for %s.", processName)
+		return "", fmt.Errorf("no log file for %q", processName)
 	}
 
 	logs, err := os.ReadFile(proc.LogPath)
@@ -77,7 +47,7 @@ func (c *UinitClient) Logs(processName string) (string, error) {
 	}
 
 	if len(logs) == 0 {
-		return "", fmt.Errorf("No logs yet for %s.", processName)
+		return "", fmt.Errorf("no logs yet for %q", processName)
 	}
 
 	return string(logs), nil
