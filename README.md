@@ -6,7 +6,7 @@
 uinit runs as a daemon that loads a list of processes from a YAML file and exposes
 them over a Unix socket. A CLI client talks to the daemon to inspect them.
 
-This is a learning project for exploring Linux processes, signals, and Go systems
+> This is a learning project for exploring Linux processes, signals, and Go systems
 programming.
 
 ## Install
