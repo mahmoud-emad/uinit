@@ -43,6 +43,21 @@ func (pm *ProcessManager) handleRequest(req Request) Response {
 			OK:   true,
 			Data: encoded,
 		}
+	case "START":
+		proc, err := pm.Start(req.Process)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		encoded, err := json.Marshal(proc)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		return Response{
+			OK:   true,
+			Data: encoded,
+		}
 	case "LOGS", "INSPECT":
 		logs, err := pm.Inspect(req.Process)
 		if err != nil {
@@ -83,6 +98,18 @@ func (pm *ProcessManager) List() []*process.Process {
 func (pm *ProcessManager) Inspect(processName string) (*process.Process, error) {
 	proc, err := pm.getProcessByName(processName)
 	if err != nil {
+		return nil, err
+	}
+	return proc, nil
+}
+
+func (pm *ProcessManager) Start(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := proc.Start(); err != nil {
 		return nil, err
 	}
 	return proc, nil

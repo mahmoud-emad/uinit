@@ -37,6 +37,22 @@ func (c *UinitClient) Inspect(processName string) (*ProcessInfo, error) {
 	return process, nil
 }
 
+func (c *UinitClient) Start(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	rsp, err := c.sendRequest("START", processName)
+	if err != nil {
+		return nil, err
+	}
+
+	var process *ProcessInfo
+
+	if err := c.decodeResponse(rsp.Data, &process); err != nil {
+		return nil, err
+	}
+	return process, nil
+}
+
 func (c *UinitClient) Logs(processName string) (string, error) {
 	defer func() { _ = c.conn.Close() }()
 

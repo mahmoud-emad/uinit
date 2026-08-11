@@ -57,6 +57,10 @@ func (s Status) String() string {
 }
 
 func (p *Process) Start() error {
+	if p.Status == Running || p.Status == Starting {
+		return fmt.Errorf("process is in %s state", strings.ToLower(p.Status.String()))
+	}
+
 	p.Status = Starting
 	p.StartedAt = time.Now()
 	p.StoppedAt = time.Time{}
