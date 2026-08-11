@@ -21,6 +21,22 @@ func (c *UinitClient) List() ([]ProcessInfo, error) {
 	return processes, nil
 }
 
+func (c *UinitClient) Inspect(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	rsp, err := c.sendRequest("INSPECT", processName)
+	if err != nil {
+		return nil, err
+	}
+
+	var process *ProcessInfo
+
+	if err := c.decodeResponse(rsp.Data, &process); err != nil {
+		return nil, err
+	}
+	return process, nil
+}
+
 func (c *UinitClient) Logs(processName string) (string, error) {
 	defer func() { _ = c.conn.Close() }()
 
@@ -36,7 +52,7 @@ func (c *UinitClient) Logs(processName string) (string, error) {
 	}
 
 	if proc.LogPath == "" {
-		return "", fmt.Errorf("No log file for %s .", processName)
+		return "", fmt.Errorf("No log file for %s.", processName)
 	}
 
 	logs, err := os.ReadFile(proc.LogPath)
@@ -45,7 +61,7 @@ func (c *UinitClient) Logs(processName string) (string, error) {
 	}
 
 	if len(logs) == 0 {
-		return "", fmt.Errorf("No logs yet for %s .", processName)
+		return "", fmt.Errorf("No logs yet for %s.", processName)
 	}
 
 	return string(logs), nil
