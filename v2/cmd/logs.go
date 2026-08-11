@@ -8,33 +8,34 @@ import (
 	"github.com/uinit/internal/config"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all configured processes",
+var logsCmd = &cobra.Command{
+	Use:   "logs <process>",
+	Short: "Show the logs of a process",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return listProcesses()
+		return logsProcess(args[0])
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(logsCmd)
 }
 
-func listProcesses() error {
+func logsProcess(processName string) error {
 	cli, err := client.NewClient(config.GetSockFile())
 	if err != nil {
 		return err
 	}
 
-	prosesses, err := cli.List()
+	logs, err := cli.Logs(processName)
 	if err != nil {
 		return err
 	}
 
-	printList(prosesses)
+	printLogs(logs)
 	return nil
 }
 
-func printList(prosesses []client.ProcessInfo) {
-	fmt.Println(prosesses)
+func printLogs(logs string) {
+	fmt.Println(logs)
 }

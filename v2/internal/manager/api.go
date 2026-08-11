@@ -8,8 +8,6 @@ import (
 	"github.com/uinit/internal/process"
 )
 
-const RuntimeDir = "/tmp/uinit"
-
 type Request struct {
 	Action  string `json:"action"`
 	Process string `json:"process,omitempty"`
@@ -45,7 +43,21 @@ func (pm *ProcessManager) handleRequest(req Request) Response {
 			OK:   true,
 			Data: encoded,
 		}
+	case "LOGS":
+		logs, err := pm.Logs(req.Process)
+		if err != nil {
+			return errorResponse(err)
+		}
 
+		encoded, err := json.Marshal(logs)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		return Response{
+			OK:   true,
+			Data: encoded,
+		}
 	default:
 		return Response{
 			OK: false,
@@ -66,4 +78,12 @@ func errorResponse(err error) Response {
 
 func (pm *ProcessManager) List() []*process.Process {
 	return pm.processes
+}
+
+func (pm *ProcessManager) Logs(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
+	}
+	return proc, nil
 }

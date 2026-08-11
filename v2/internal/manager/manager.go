@@ -75,3 +75,13 @@ func (pm *ProcessManager) stopProcesses() error {
 	}
 	return nil
 }
+
+func (pm *ProcessManager) getProcessByName(processName string) (*process.Process, error) {
+	for _, process := range pm.processes {
+		if process.Name != processName {
+			continue
+		}
+		return process, nil
+	}
+	return nil, fmt.Errorf("cannot find process with name %s", processName)
+}
