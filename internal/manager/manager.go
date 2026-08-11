@@ -1,195 +1,92 @@
-// Package manager runs the configured processes and serves the daemon
-// socket the client talks to.
+// Package manager loads the configured processes and serves them to clients.
 package manager
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
 
 	"github.com/uinit/internal/config"
 	"github.com/uinit/internal/process"
 )
 
-const (
-	// SocketPath is where the daemon listens, and where the client dials.
-	SocketPath = "/tmp/uinit.sock"
-
-	logDirPath = "/tmp/uinit/logs"
-)
-
-// ManagedProcess is a configured process plus the state the daemon keeps
-// for it.
-type ManagedProcess struct {
-	Config  config.Process
-	Runtime process.Runtime
-	LogFile string
-}
-
-// ProcessInfo is the client facing view of a managed process.
-type ProcessInfo struct {
-	Name      string         `json:"name"`
-	Cmd       string         `json:"cmd"`
-	Status    process.Status `json:"status"`
-	PID       int            `json:"pid"`
-	StartedAt time.Time      `json:"started_at"`
-	StoppedAt time.Time      `json:"stopped_at"`
-	ExitCode  int            `json:"exit_code"`
-	LogFile   string         `json:"log_file"`
-}
-
-func (p ManagedProcess) Info() ProcessInfo {
-	return ProcessInfo{
-		Name:      p.Config.Name,
-		Cmd:       p.Config.Cmd,
-		Status:    p.Runtime.Status,
-		PID:       p.Runtime.PID,
-		StartedAt: p.Runtime.StartedAt,
-		StoppedAt: p.Runtime.StoppedAt,
-		ExitCode:  p.Runtime.ExitCode,
-		LogFile:   p.LogFile,
-	}
-}
-
 type ProcessManager struct {
-	socketPath string
-	logDirPath string
-	configFile string
-
-	// The monitors write to processes while connections read from it, so
-	// both sides go through mu.
-	mu        sync.Mutex
-	processes []ManagedProcess
+	cfg       config.Config
+	processes []*process.Process
 }
 
-func NewProcessManager(configFile string) (*ProcessManager, error) {
-	cfg, err := config.NewConfig(configFile)
+// NewManager returns a process manager loaded from the given `yaml` config file.
+func NewManager(configFilePath string) (*ProcessManager, error) {
+	cfg, err := config.Load(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Socket directory.
-	if err := os.MkdirAll(filepath.Dir(SocketPath), 0755); err != nil {
-		return nil, err
+	// The socket and the log files both live under the runtime dir, so it
+	// has to exist before any process starts or the listener binds.
+	if err := os.MkdirAll(config.GetLogDir(), 0755); err != nil {
+		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
-	// Log directory.
-	if err := os.MkdirAll(logDirPath, 0755); err != nil {
-		return nil, fmt.Errorf(
-			"create log directory: %w",
-			err,
-		)
+	pm := ProcessManager{
+		cfg: cfg,
 	}
 
-	pm := &ProcessManager{
-		socketPath: SocketPath,
-		logDirPath: logDirPath,
-		configFile: configFile,
-	}
+	pm.loadProcesses(cfg)
 
-	pm.registerProcesses(cfg)
+	pm.startProcesses()
 
-	if err := pm.startProcesses(); err != nil {
-		return nil, err
-	}
-
-	return pm, nil
+	return &pm, nil
 }
 
-func (pm *ProcessManager) registerProcesses(cfg config.Config) {
+func (pm *ProcessManager) loadProcesses(cfg config.Config) {
 	for _, cfgProcess := range cfg.Processes {
-		pm.processes = append(pm.processes, ManagedProcess{
-			Config: cfgProcess,
-			Runtime: process.Runtime{
-				Status:    process.Loaded,
-				StartedAt: time.Now(),
-			},
+		logPath := filepath.Join(
+			config.GetLogDir(),
+			cfgProcess.Name+".log",
+		)
+
+		pm.processes = append(pm.processes, &process.Process{
+			Name:    cfgProcess.Name,
+			Cmd:     cfgProcess.Cmd,
+			Status:  process.Loaded,
+			LogPath: logPath,
 		})
 	}
 }
 
-func (pm *ProcessManager) startProcesses() error {
+func (pm *ProcessManager) startProcesses() {
+	for _, p := range pm.processes {
+		if err := p.Start(); err != nil {
+			log.Printf(
+				"failed to start process %q: %v",
+				p.Name,
+				err,
+			)
+		}
+	}
+}
+
+func (pm *ProcessManager) stopProcesses() error {
 	if len(pm.processes) == 0 {
 		return fmt.Errorf("there are no registered processes to start")
 	}
 
-	for i := range pm.processes {
-		if err := pm.startProcess(&pm.processes[i]); err != nil {
+	for _, process := range pm.processes {
+		if err := process.Stop(); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-// startProcess takes a pointer into pm.processes so the status it writes is
-// visible to everything else reading the slice.
-func (pm *ProcessManager) startProcess(proc *ManagedProcess) error {
-	proc.Runtime.Status = process.Starting
-	proc.Runtime.StartedAt = time.Now()
-	proc.Runtime.StoppedAt = time.Time{}
-	proc.Runtime.ExitCode = 0
-
-	logPath := filepath.Join(pm.logDirPath, proc.Config.Name+".log")
-
-	logFile, err := os.OpenFile(
-		logPath,
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-		0644,
-	)
-	if err != nil {
-		proc.Runtime.Status = process.Failed
-
-		return fmt.Errorf(
-			"open log file for %q: %w",
-			proc.Config.Name,
-			err,
-		)
+func (pm *ProcessManager) getProcessByName(processName string) (*process.Process, error) {
+	for _, process := range pm.processes {
+		if process.Name != processName {
+			continue
+		}
+		return process, nil
 	}
-
-	p, err := process.Start(proc.Config.Cmd, logFile)
-	if err != nil {
-		_ = logFile.Close()
-
-		proc.Runtime.Status = process.Failed
-
-		return fmt.Errorf(
-			"failed to start process %q: %w",
-			proc.Config.Name,
-			err,
-		)
-	}
-
-	proc.Runtime.PID = p.PID()
-	proc.Runtime.Status = process.Running
-	proc.LogFile = logPath
-
-	go pm.monitorProcess(proc, p, logFile)
-
-	return nil
-}
-
-func (pm *ProcessManager) monitorProcess(
-	proc *ManagedProcess,
-	p *process.Process,
-	logFile *os.File,
-) {
-	defer func() { _ = logFile.Close() }()
-
-	err := p.Wait()
-
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	proc.Runtime.StoppedAt = time.Now()
-	proc.Runtime.ExitCode = p.ExitCode()
-
-	if err != nil {
-		proc.Runtime.Status = process.Failed
-		return
-	}
-
-	proc.Runtime.Status = process.Exited
+	return nil, fmt.Errorf("cannot find process with name %s", processName)
 }

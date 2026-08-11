@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/uinit/internal/config"
 )
 
 func (pm *ProcessManager) Run() error {
-	listener, err := net.Listen("unix", pm.socketPath)
+	listener, err := net.Listen("unix", config.GetSockFile())
 	if err != nil {
 		if errors.Is(err, syscall.EADDRINUSE) {
 			return fmt.Errorf("uinit daemon is already running")
@@ -24,12 +26,12 @@ func (pm *ProcessManager) Run() error {
 
 	defer func() {
 		_ = listener.Close()
-		_ = os.Remove(pm.socketPath)
+		_ = os.Remove(config.GetSockFile())
 	}()
 
 	pm.handleSignals(listener)
 
-	log.Printf("Listening on Unix socket: %s", pm.socketPath)
+	log.Printf("Listening on Unix socket: %s", config.GetSockFile())
 
 	for {
 		conn, err := listener.Accept()
@@ -61,6 +63,9 @@ func (pm *ProcessManager) handleSignals(listener net.Listener) {
 		<-sigChan
 
 		log.Println("Shutting down uinit...")
+		if err := pm.stopProcesses(); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
 
 		_ = listener.Close()
 	}()

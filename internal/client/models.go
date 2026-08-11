@@ -1,10 +1,20 @@
 package client
 
 import (
-	"net"
+	"time"
+
+	"github.com/uinit/internal/process"
 )
 
-type UinitClient struct {
-	socketPath string
-	conn       net.Conn
+type ProcessInfo struct {
+	Name string
+	Cmd  string
+
+	LogPath string
+
+	Status    process.Status
+	PID       int
+	StartedAt time.Time
+	StoppedAt time.Time
+	ExitCode  int
 }

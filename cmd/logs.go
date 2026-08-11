@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uinit/internal/client"
-	"github.com/uinit/internal/manager"
+	"github.com/uinit/internal/config"
 )
 
 var logsCmd = &cobra.Command{
@@ -22,19 +22,20 @@ func init() {
 }
 
 func logsProcess(processName string) error {
-	cli, err := client.NewClient(manager.SocketPath)
+	cli, err := client.NewClient(config.GetSockFile())
 	if err != nil {
 		return err
 	}
 
-	rsp, err := cli.Logs(processName)
+	logs, err := cli.Logs(processName)
 	if err != nil {
 		return err
 	}
 
-	if !rsp.OK {
-		return fmt.Errorf("response error %s", rsp.Message)
-	}
+	printLogs(logs)
+	return nil
+}
 
-	return printLogs(rsp.Data)
+func printLogs(logs string) {
+	fmt.Println(logs)
 }

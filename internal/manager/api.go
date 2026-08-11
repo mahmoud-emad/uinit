@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/uinit/internal/process"
 )
@@ -15,9 +14,9 @@ type Request struct {
 }
 
 type Response struct {
-	OK      bool          `json:"ok"`
-	Message string        `json:"message,omitempty"`
-	Data    []ProcessInfo `json:"data,omitempty"`
+	OK      bool            `json:"ok"`
+	Message string          `json:"message,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 func (pm *ProcessManager) sendResponse(conn net.Conn, rsp Response) error {
@@ -27,55 +26,68 @@ func (pm *ProcessManager) sendResponse(conn net.Conn, rsp Response) error {
 	}
 
 	encoded = append(encoded, '\n')
+
 	_, err = conn.Write(encoded)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (pm *ProcessManager) handleRequest(req Request) Response {
 	switch req.Action {
 	case "LIST":
-		return Response{
-			OK:   true,
-			Data: pm.List(),
-		}
-
-	// Both answer with the same view, the client either prints it or reads
-	// the log file it points at.
-	case "INSPECT", "LOGS", "STATUS":
-		info, err := pm.Inspect(req.Process)
+		encoded, err := json.Marshal(pm.List())
 		if err != nil {
 			return errorResponse(err)
 		}
 
 		return Response{
 			OK:   true,
-			Data: []ProcessInfo{info},
+			Data: encoded,
 		}
 	case "START":
-		info, err := pm.Start(req.Process)
+		proc, err := pm.Start(req.Process)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		encoded, err := json.Marshal(proc)
 		if err != nil {
 			return errorResponse(err)
 		}
 
 		return Response{
 			OK:   true,
-			Data: []ProcessInfo{info},
+			Data: encoded,
 		}
-
 	case "STOP":
-		info, err := pm.Stop(req.Process)
+		proc, err := pm.Stop(req.Process)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		encoded, err := json.Marshal(proc)
 		if err != nil {
 			return errorResponse(err)
 		}
 
 		return Response{
 			OK:   true,
-			Data: []ProcessInfo{info},
+			Data: encoded,
+		}
+	case "LOGS", "INSPECT":
+		logs, err := pm.Inspect(req.Process)
+		if err != nil {
+			return errorResponse(err)
 		}
 
+		encoded, err := json.Marshal(logs)
+		if err != nil {
+			return errorResponse(err)
+		}
+
+		return Response{
+			OK:   true,
+			Data: encoded,
+		}
 	default:
 		return Response{
 			OK: false,
@@ -94,169 +106,38 @@ func errorResponse(err error) Response {
 	}
 }
 
-func (pm *ProcessManager) List() []ProcessInfo {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	processes := make([]ProcessInfo, 0, len(pm.processes))
-
-	for _, p := range pm.processes {
-		processes = append(processes, p.Info())
-	}
-
-	return processes
+func (pm *ProcessManager) List() []*process.Process {
+	return pm.processes
 }
 
-func (pm *ProcessManager) Inspect(name string) (ProcessInfo, error) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	for _, p := range pm.processes {
-		if p.Config.Name != name {
-			continue
-		}
-
-		return p.Info(), nil
+func (pm *ProcessManager) Inspect(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
 	}
-
-	return ProcessInfo{}, fmt.Errorf(
-		"process %q not found",
-		name,
-	)
+	return proc, nil
 }
 
-// startSettle is how long Start waits before reporting back. A successful
-// fork/exec only means the kernel accepted the command, a process that dies
-// on startup takes a moment to be reaped, and reporting "running" before then
-// is a lie the next LIST contradicts.
-const startSettle = 300 * time.Millisecond
-
-func (pm *ProcessManager) Start(name string) (ProcessInfo, error) {
-	pm.mu.Lock()
-
-	idx := -1
-
-	for i := range pm.processes {
-		if pm.processes[i].Config.Name == name {
-			idx = i
-			break
-		}
+func (pm *ProcessManager) Start(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
 	}
 
-	if idx == -1 {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q not found",
-			name,
-		)
+	if err := proc.Start(); err != nil {
+		return nil, err
 	}
-
-	p := &pm.processes[idx]
-
-	if p.Runtime.Status == process.Running {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q is already running",
-			name,
-		)
-	}
-
-	if p.Runtime.Status == process.Starting {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q is starting",
-			name,
-		)
-	}
-
-	if err := pm.startProcess(p); err != nil {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, err
-	}
-
-	pm.mu.Unlock()
-
-	// The monitor takes pm.mu to record an early exit, so waiting while
-	// holding it would guarantee we still see the stale "running".
-	time.Sleep(startSettle)
-
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	// idx stays valid, processes are only appended at registration.
-	info := pm.processes[idx].Info()
-
-	if info.Status != process.Running {
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q %s on startup (exit code %d), see %s",
-			name,
-			info.Status,
-			info.ExitCode,
-			info.LogFile,
-		)
-	}
-
-	return info, nil
+	return proc, nil
 }
 
-func (pm *ProcessManager) Stop(name string) (ProcessInfo, error) {
-	pm.mu.Lock()
-
-	idx := -1
-
-	for i := range pm.processes {
-		if pm.processes[i].Config.Name == name {
-			idx = i
-			break
-		}
+func (pm *ProcessManager) Stop(processName string) (*process.Process, error) {
+	proc, err := pm.getProcessByName(processName)
+	if err != nil {
+		return nil, err
 	}
 
-	if idx == -1 {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q not found",
-			name,
-		)
+	if err := proc.Stop(); err != nil {
+		return nil, err
 	}
-
-	p := &pm.processes[idx]
-
-	if p.Runtime.Status == process.Failed ||
-		p.Runtime.Status == process.Exited ||
-		p.Runtime.Status == process.Stopped {
-		pm.mu.Unlock()
-
-		return ProcessInfo{}, fmt.Errorf(
-			"process %q is already down",
-			name,
-		)
-	}
-
-	pid := p.Runtime.PID
-
-	pm.mu.Unlock()
-
-	// Don't hold the mutex while talking to the OS.
-	if err := process.Kill(pid); err != nil {
-		return ProcessInfo{}, fmt.Errorf(
-			"failed to stop process %q: %w",
-			name,
-			err,
-		)
-	}
-
-	// Give monitorProcess a chance to observe the exit.
-	time.Sleep(startSettle)
-
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	info := pm.processes[idx].Info()
-
-	return info, nil
+	return proc, nil
 }

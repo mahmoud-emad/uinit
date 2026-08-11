@@ -45,11 +45,10 @@ In another terminal, list the processes:
 ```
 
 ```
-PROCESS        STATUS      PID      UPTIME   COMMAND
-─────────────────────────────────────────────────────────────────────
-python-server  ● running   45609    7s       python3 -m http.server
-ping           ● running   45610    7s       ping 8.8.8.8
-sleep-five     ○ exited    45611    5s       sleep 5
+PROCESS        STATUS     PID    UPTIME  COMMAND
+python-server  ● running  45609  7s      python3 -m http.server
+ping           ● running  45610  7s      ping 8.8.8.8
+sleep-five     ○ exited   45611  5s      sleep 5
 ```
 
 Inspect one of them, or read what it has written:
@@ -59,7 +58,16 @@ Inspect one of them, or read what it has written:
 ./uinit logs ping
 ```
 
-Each process writes its stdout and stderr to `/tmp/uinit/logs/<name>.log`.
+Processes can also be stopped and started again while the daemon runs:
+
+```sh
+./uinit stop ping
+./uinit start ping
+```
+
+The daemon keeps its state under `/tmp/uinit`: it listens on
+`/tmp/uinit/uinit.sock`, and each process writes its stdout and stderr to
+`/tmp/uinit/logs/<name>.log`.
 
 ## Development
 

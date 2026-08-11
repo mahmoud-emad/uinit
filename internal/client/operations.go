@@ -1,45 +1,54 @@
 package client
 
 import (
-	"bufio"
-	"encoding/json"
-
-	"github.com/uinit/internal/manager"
+	"fmt"
+	"os"
 )
 
-func (c *UinitClient) sendRequest(
-	action string,
-	processName string,
-) (manager.Response, error) {
-	req := manager.Request{
-		Action:  action,
-		Process: processName,
-	}
+func (c *UinitClient) List() ([]ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
 
-	rsp := manager.Response{}
+	return request[[]ProcessInfo](c, "LIST", "")
+}
 
-	encoded, err := json.Marshal(req)
+func (c *UinitClient) Inspect(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	return request[*ProcessInfo](c, "INSPECT", processName)
+}
+
+func (c *UinitClient) Start(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	return request[*ProcessInfo](c, "START", processName)
+}
+
+func (c *UinitClient) Stop(processName string) (*ProcessInfo, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	return request[*ProcessInfo](c, "STOP", processName)
+}
+
+func (c *UinitClient) Logs(processName string) (string, error) {
+	defer func() { _ = c.conn.Close() }()
+
+	proc, err := request[*ProcessInfo](c, "LOGS", processName)
 	if err != nil {
-		return rsp, err
+		return "", err
 	}
 
-	encoded = append(encoded, '\n')
+	if proc.LogPath == "" {
+		return "", fmt.Errorf("no log file for %q", processName)
+	}
 
-	_, err = c.conn.Write(encoded)
+	logs, err := os.ReadFile(proc.LogPath)
 	if err != nil {
-		return rsp, err
+		return "", err
 	}
 
-	reader := bufio.NewReader(c.conn)
-
-	line, err := reader.ReadBytes('\n')
-	if err != nil {
-		return rsp, err
+	if len(logs) == 0 {
+		return "", fmt.Errorf("no logs yet for %q", processName)
 	}
 
-	if err := json.Unmarshal(line, &rsp); err != nil {
-		return rsp, err
-	}
-
-	return rsp, nil
+	return string(logs), nil
 }

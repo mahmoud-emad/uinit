@@ -1,13 +1,33 @@
-// Package config loads the process list from a YAML file.
+// Package config loads the process manager configuration from YAML.
 package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
-func NewConfig(filePath string) (Config, error) {
+const RuntimeDir = "/tmp/uinit"
+
+type ProcessConfig struct {
+	Name string `yaml:"name"`
+	Cmd  string `yaml:"cmd"`
+}
+
+type Config struct {
+	Processes []ProcessConfig `yaml:"processes"`
+}
+
+func GetSockFile() string {
+	return filepath.Join(RuntimeDir, "uinit.sock")
+}
+
+func GetLogDir() string {
+	return filepath.Join(RuntimeDir, "logs")
+}
+
+func Load(filePath string) (Config, error) {
 	cfg := Config{}
 
 	data, err := os.ReadFile(filePath)
