@@ -25,7 +25,12 @@ func (pm *ProcessManager) Run() error {
 	if err != nil {
 		return fmt.Errorf("open daemon log: %w", err)
 	}
-	defer logFile.Close()
+
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			log.Printf("failed to close daemon log: %v", err)
+		}
+	}()
 
 	log.SetOutput(logFile)
 	log.SetFlags(log.Ldate | log.Ltime)
