@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/uinit/internal/client"
-	"github.com/uinit/internal/manager"
+	"github.com/uinit/internal/config"
 )
 
 var listCmd = &cobra.Command{
@@ -21,20 +19,16 @@ func init() {
 }
 
 func listProcesses() error {
-	cli, err := client.NewClient(manager.SocketPath)
+	cli, err := client.NewClient(config.GetSockFile())
 	if err != nil {
 		return err
 	}
 
-	rsp, err := cli.List()
+	prosesses, err := cli.List()
 	if err != nil {
 		return err
 	}
 
-	if !rsp.OK {
-		return fmt.Errorf("response error %s", rsp.Message)
-	}
-
-	printList(rsp.Data)
+	printList(prosesses)
 	return nil
 }

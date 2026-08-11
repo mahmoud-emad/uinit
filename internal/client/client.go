@@ -2,10 +2,18 @@
 package client
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
 	"net"
 
 	"github.com/uinit/internal/manager"
 )
+
+type UinitClient struct {
+	socketPath string
+	conn       net.Conn
+}
 
 func NewClient(socketPath string) (UinitClient, error) {
 	cli := UinitClient{
@@ -30,68 +38,66 @@ func (c *UinitClient) connect() (net.Conn, error) {
 	return conn, nil
 }
 
-func (c *UinitClient) List() (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
+func request[T any](
+	c *UinitClient,
+	action string,
+	processName string,
+) (T, error) {
+	var result T
 
-	rsp, err := c.sendRequest("LIST", "")
+	rsp, err := c.sendRequest(action, processName)
 	if err != nil {
-		return manager.Response{}, err
+		return result, err
+	}
+
+	if !rsp.OK {
+		return result, fmt.Errorf("%s", rsp.Message)
+	}
+
+	if err := c.decodeResponse(rsp.Data, &result); err != nil {
+		return result, err
+	}
+
+	return result, nil
+}
+
+func (c *UinitClient) sendRequest(
+	action string,
+	processName string,
+) (manager.Response, error) {
+	req := manager.Request{
+		Action:  action,
+		Process: processName,
+	}
+
+	rsp := manager.Response{}
+
+	encoded, err := json.Marshal(req)
+	if err != nil {
+		return rsp, err
+	}
+
+	encoded = append(encoded, '\n')
+
+	_, err = c.conn.Write(encoded)
+	if err != nil {
+		return rsp, err
+	}
+
+	reader := bufio.NewReader(c.conn)
+
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return rsp, err
+	}
+
+	if err := json.Unmarshal(line, &rsp); err != nil {
+		return rsp, err
 	}
 
 	return rsp, nil
 }
 
-func (c *UinitClient) Inspect(processName string) (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
-
-	rsp, err := c.sendRequest("INSPECT", processName)
-	if err != nil {
-		return manager.Response{}, err
-	}
-
-	return rsp, nil
-}
-
-func (c *UinitClient) Logs(processName string) (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
-
-	rsp, err := c.sendRequest("LOGS", processName)
-	if err != nil {
-		return manager.Response{}, err
-	}
-
-	return rsp, nil
-}
-
-func (c *UinitClient) Status(processName string) (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
-
-	rsp, err := c.sendRequest("STATUS", processName)
-	if err != nil {
-		return manager.Response{}, err
-	}
-
-	return rsp, nil
-}
-
-func (c *UinitClient) Start(processName string) (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
-
-	rsp, err := c.sendRequest("START", processName)
-	if err != nil {
-		return manager.Response{}, err
-	}
-
-	return rsp, nil
-}
-
-func (c *UinitClient) Stop(processName string) (manager.Response, error) {
-	defer func() { _ = c.conn.Close() }()
-
-	rsp, err := c.sendRequest("STOP", processName)
-	if err != nil {
-		return manager.Response{}, err
-	}
-
-	return rsp, nil
+func (c *UinitClient) decodeResponse(data []byte, target any) error {
+	return json.Unmarshal(data, target)
 }

@@ -1,16 +1,14 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/uinit/internal/client"
-	"github.com/uinit/internal/manager"
+	"github.com/uinit/internal/config"
 )
 
 var inspectCmd = &cobra.Command{
 	Use:   "inspect <process>",
-	Short: "Inspect process",
+	Short: "Show the process details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return inspectProcess(args[0])
@@ -22,20 +20,16 @@ func init() {
 }
 
 func inspectProcess(processName string) error {
-	cli, err := client.NewClient(manager.SocketPath)
+	cli, err := client.NewClient(config.GetSockFile())
 	if err != nil {
 		return err
 	}
 
-	rsp, err := cli.Inspect(processName)
+	proc, err := cli.Inspect(processName)
 	if err != nil {
 		return err
 	}
 
-	if !rsp.OK {
-		return fmt.Errorf("response error %s", rsp.Message)
-	}
-
-	printInspect(rsp.Data)
+	printInspect(proc)
 	return nil
 }
