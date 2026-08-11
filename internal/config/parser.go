@@ -23,6 +23,10 @@ func GetSockFile() string {
 	return filepath.Join(RuntimeDir, "uinit.sock")
 }
 
+func GetDaemonLogFile() string {
+	return filepath.Join(GetLogDir(), "daemon.log")
+}
+
 func GetLogDir() string {
 	return filepath.Join(RuntimeDir, "logs")
 }

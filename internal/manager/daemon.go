@@ -15,6 +15,21 @@ import (
 )
 
 func (pm *ProcessManager) Run() error {
+	daemonLogPath := config.GetDaemonLogFile()
+
+	logFile, err := os.OpenFile(
+		daemonLogPath,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		return fmt.Errorf("open daemon log: %w", err)
+	}
+	defer logFile.Close()
+
+	log.SetOutput(logFile)
+	log.SetFlags(log.Ldate | log.Ltime)
+
 	listener, err := net.Listen("unix", config.GetSockFile())
 	if err != nil {
 		if errors.Is(err, syscall.EADDRINUSE) {
@@ -29,9 +44,10 @@ func (pm *ProcessManager) Run() error {
 		_ = os.Remove(config.GetSockFile())
 	}()
 
-	pm.handleSignals(listener)
+	log.Printf("uinit daemon started")
+	log.Printf("listening on Unix socket: %s", config.GetSockFile())
 
-	log.Printf("Listening on Unix socket: %s", config.GetSockFile())
+	pm.handleSignals(listener)
 
 	for {
 		conn, err := listener.Accept()
@@ -40,6 +56,7 @@ func (pm *ProcessManager) Run() error {
 				return nil
 			}
 
+			log.Printf("accept error: %v", err)
 			return err
 		}
 
